@@ -68,14 +68,13 @@ elif menu == "Explicabilité":
 
     rule, act = explain_rule(thalach, oldpeak, ca, thal)
 
-if rule is None:
+    if rule is None:
 
-    st.warning(
-        "⚠️ Aucune règle n'a été activée. "
-        "Le système ne peut pas fournir d'explication."
-    )
+        st.warning(
+            "⚠️ Aucune règle n'a été activée. "
+            "Le système ne peut pas fournir d'explication."
+        )
 
-else:
-
-    st.code(rule)
-    st.write("Activation :", act)
+    else:
+        st.code(rule)
+        st.write("Activation :", act)
