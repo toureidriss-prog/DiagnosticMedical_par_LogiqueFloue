@@ -35,16 +35,26 @@ elif menu == "Diagnostic":
 
         cls, val = predict(thalach, oldpeak, ca, thal)
 
-        labels = {
-            0:"Sain",
-            1:"Faible",
-            2:"Modéré",
-            3:"Sévère",
-            4:"Très sévère"
-        }
+        # aucune règle activée
+        if cls is None:
 
-        st.success(f"Classe : {labels[cls]}")
-        st.info(f"Score flou : {val:.2f}")
+            st.warning(
+                "⚠️ Aucune règle de la base de connaissances "
+                "n'a été activée pour cette combinaison d'entrée."
+            )
+
+        else:
+
+            labels = {
+                0:"Sain",
+                1:"Faible",
+                2:"Modéré",
+                3:"Sévère",
+                4:"Très sévère"
+            }
+
+            st.success(f"Classe : {labels[cls]}")
+            st.info(f"Score flou : {val:.2f}")
 
 # ===================== EXPLICABILITÉ =====================
 elif menu == "Explicabilité":
@@ -56,9 +66,16 @@ elif menu == "Explicabilité":
     ca = st.selectbox("CA", [0,1,2,3])
     thal = st.selectbox("Thal", [3,6,7])
 
-    if st.button("Expliquer"):
+    rule, act = explain_rule(thalach, oldpeak, ca, thal)
 
-        rule, act = explain_rule(thalach, oldpeak, ca, thal)
+if rule is None:
 
-        st.code(rule)
-        st.write("Activation :", act)
+    st.warning(
+        "⚠️ Aucune règle n'a été activée. "
+        "Le système ne peut pas fournir d'explication."
+    )
+
+else:
+
+    st.code(rule)
+    st.write("Activation :", act)
