@@ -26,14 +26,6 @@ rules_df = pd.read_csv("rules.csv")
 # =========================
 # FUZZY SETUP
 # =========================
-thalach = ctrl.Antecedent(np.arange(60, 221, 1), 'thalach')
-oldpeak = ctrl.Antecedent(np.arange(0, 7.1, 0.1), 'oldpeak')
-ca = ctrl.Antecedent(np.arange(0, 4, 1), 'ca')
-thal = ctrl.Antecedent(np.array([3,6,7]), 'thal')
-num = ctrl.Consequent(np.arange(0, 4.1, 0.1), 'num')
-
-# (tu peux copier exactement tes MF ici — inchangé)
-# ...
 
 thalach = ctrl.Antecedent(np.arange(60, 221, 1), 'thalach')
 oldpeak = ctrl.Antecedent(np.arange(0, 7.1, 0.1), 'oldpeak')
@@ -109,8 +101,55 @@ fuzzy_rules = [
 
 system = ctrl.ControlSystem(fuzzy_rules)
 
+
+
+def has_activated_rule(thalach_val, oldpeak_val, ca_val, thal_val):
+    """
+    Vérifie si au moins une règle de la base est activée
+    """
+
+    for _, r in rules_df.iterrows():
+
+        activation = min(
+            fuzz.interp_membership(
+                thalach.universe,
+                thalach[r.thalach].mf,
+                thalach_val
+            ),
+
+            fuzz.interp_membership(
+                oldpeak.universe,
+                oldpeak[r.oldpeak].mf,
+                oldpeak_val
+            ),
+
+            fuzz.interp_membership(
+                ca.universe,
+                ca[r.ca].mf,
+                ca_val
+            ),
+
+            fuzz.interp_membership(
+                thal.universe,
+                thal[r.thal].mf,
+                thal_val
+            )
+        )
+
+        # au moins une règle activée
+        if activation > 0:
+            return True
+
+    return False
+
+
+
 # IMPORTANT: new simulation per prediction
 def predict(thalach_val, oldpeak_val, ca_val, thal_val):
+
+    # Vérifier si une règle s'active
+    if not has_activated_rule(thalach_val, oldpeak_val, ca_val, thal_val):
+        return None, None
 
     sim = ctrl.ControlSystemSimulation(system)
 
@@ -119,7 +158,14 @@ def predict(thalach_val, oldpeak_val, ca_val, thal_val):
     sim.input['ca'] = ca_val
     sim.input['thal'] = thal_val
 
-    sim.compute()
+    try:
+        sim.compute()
+    except:
+        return None, None
+
+    # sécurité supplémentaire
+    if 'num' not in sim.output:
+        return None, None
 
     x = sim.output['num']
 
@@ -140,28 +186,61 @@ def predict(thalach_val, oldpeak_val, ca_val, thal_val):
 # =========================
 def explain_rule(thalach_val, oldpeak_val, ca_val, thal_val):
 
+    # Vérification préalable
+    if not has_activated_rule(thalach_val, oldpeak_val, ca_val, thal_val):
+        return None, None
+
     best_rule = None
     best_activation = 0
 
     for _, r in rules_df.iterrows():
 
-        activation = min(
-            thalach[r.thalach].mf[np.argmin(np.abs(thalach.universe - thalach_val))],
-            oldpeak[r.oldpeak].mf[np.argmin(np.abs(oldpeak.universe - oldpeak_val))],
-            ca[r.ca].mf[np.argmin(np.abs(ca.universe - ca_val))],
-            thal[r.thal].mf[np.argmin(np.abs(thal.universe - thal_val))]
-        )
+        try:
+            activation = min(
+
+                fuzz.interp_membership(
+                    thalach.universe,
+                    thalach[r["thalach"]].mf,
+                    thalach_val
+                ),
+
+                fuzz.interp_membership(
+                    oldpeak.universe,
+                    oldpeak[r["oldpeak"]].mf,
+                    oldpeak_val
+                ),
+
+                fuzz.interp_membership(
+                    ca.universe,
+                    ca[r["ca"]].mf,
+                    ca_val
+                ),
+
+                fuzz.interp_membership(
+                    thal.universe,
+                    thal[r["thal"]].mf,
+                    thal_val
+                )
+            )
+
+        except KeyError:
+            # sécurité
+            continue
 
         if activation > best_activation:
             best_activation = activation
             best_rule = r
 
+    # Double sécurité
+    if best_rule is None:
+        return None, None
+
     rule_text = f"""
-SI thalach = {best_rule.thalach}
-ET oldpeak = {best_rule.oldpeak}
-ET ca = {best_rule.ca}
-ET thal = {best_rule.thal}
-ALORS num = {best_rule.num}
+SI thalach = {best_rule['thalach']}
+ET oldpeak = {best_rule['oldpeak']}
+ET ca = {best_rule['ca']}
+ET thal = {best_rule['thal']}
+ALORS num = {best_rule['num']}
 """
 
     return rule_text, best_activation
